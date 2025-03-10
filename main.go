@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -11,13 +14,14 @@ import (
 type Action string
 
 const (
-	Connect    Action = "Connect to VPN"
-	Disconnect Action = "Disconnect from VPN"
-	ListVPNs   Action = "List available VPNs"
-	Status     Action = "Show VPN status"
-	AddVPN     Action = "Add VPN"
-	RemoveVPN  Action = "Remove VPN"
-	Exit       Action = "Exit"
+	Connect      Action = "Connect to VPN"
+	Disconnect   Action = "Disconnect from VPN"
+	ListVPNs     Action = "List available VPNs"
+	Status       Action = "Show VPN status"
+	AddVPN       Action = "Add VPN"
+	RemoveVPN    Action = "Remove VPN"
+	ExportVPN    Action = "Export VPN config"
+	Exit         Action = "Exit"
 )
 
 func executeCommand(command string, args ...string) string {
@@ -30,7 +34,6 @@ func executeCommand(command string, args ...string) string {
 }
 
 func listVPNs() string {
-	// Get all connections with their types
 	output := executeCommand("nmcli", "-t", "-f", "NAME,TYPE", "connection", "show")
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	
@@ -53,6 +56,20 @@ func listVPNs() string {
 	}
 	
 	return result.String()
+}
+
+func getVPNList() []string {
+	output := executeCommand("nmcli", "-t", "-f", "NAME,TYPE", "connection", "show")
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	
+	var vpns []string
+	for _, line := range lines {
+		if strings.Contains(line, ":vpn") {
+			vpn := strings.Split(line, ":")[0]
+			vpns = append(vpns, vpn)
+		}
+	}
+	return vpns
 }
 
 func connectVPN(vpnName string) string {
@@ -112,6 +129,32 @@ func removeVPN(vpnName string) string {
 	return executeCommand("nmcli", "connection", "delete", vpnName)
 }
 
+func exportVPN(vpnName string, outputPath string) string {
+	if outputPath == "" {
+		usr, err := user.Current()
+		if err != nil {
+			return fmt.Sprintf("Error: %s", err)
+		}
+		outputPath = filepath.Join(usr.HomeDir, vpnName+".ovpn")
+	} else {
+		if !strings.HasSuffix(outputPath, ".ovpn") {
+			outputPath = outputPath + ".ovpn"
+		}
+	}
+	
+	output := executeCommand("sudo", "nmcli", "connection", "export", vpnName)
+	if strings.Contains(output, "Error") {
+		return output
+	}
+	
+	err := os.WriteFile(outputPath, []byte(output), 0600)
+	if err != nil {
+		return fmt.Sprintf("Error writing to file: %s", err)
+	}
+	
+	return fmt.Sprintf("Successfully exported VPN configuration to %s", outputPath)
+}
+
 func main() {
 	for {
 		var action Action
@@ -127,6 +170,7 @@ func main() {
 						huh.NewOption[Action](string(Status), Status),
 						huh.NewOption[Action](string(AddVPN), AddVPN),
 						huh.NewOption[Action](string(RemoveVPN), RemoveVPN),
+						huh.NewOption[Action](string(ExportVPN), ExportVPN),
 						huh.NewOption[Action](string(Exit), Exit),
 					),
 			),
@@ -139,16 +183,29 @@ func main() {
 		
 		switch action {
 		case Connect:
-			var vpnName string
+			vpns := getVPNList()
+			if len(vpns) == 0 {
+				fmt.Println("No VPN connections available")
+				continue
+			}
+			
+			var selectedVPN string
+			vpnOptions := make([]huh.Option[string], len(vpns))
+			for i, vpn := range vpns {
+				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+			}
+			
 			vpnForm := huh.NewForm(
 				huh.NewGroup(
-					huh.NewInput().
-						Title("Enter VPN name").
-						Value(&vpnName),
+					huh.NewSelect[string]().
+						Title("Select VPN to connect").
+						Value(&selectedVPN).
+						Options(vpnOptions...),
 				),
 			)
-			if err := vpnForm.Run(); err == nil {
-				fmt.Println(connectVPN(strings.TrimSpace(vpnName)))
+			
+			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+				fmt.Println(connectVPN(selectedVPN))
 			}
 			
 		case Disconnect:
@@ -175,16 +232,78 @@ func main() {
 			}
 			
 		case RemoveVPN:
-			var vpnName string
-			vpnRemoveForm := huh.NewForm(
+			vpns := getVPNList()
+			if len(vpns) == 0 {
+				fmt.Println("No VPN connections available to remove")
+				continue
+			}
+			
+			var selectedVPN string
+			vpnOptions := make([]huh.Option[string], len(vpns))
+			for i, vpn := range vpns {
+				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+			}
+			
+			vpnForm := huh.NewForm(
 				huh.NewGroup(
-					huh.NewInput().
-						Title("Enter VPN name to remove").
-						Value(&vpnName),
+					huh.NewSelect[string]().
+						Title("Select VPN to remove").
+						Value(&selectedVPN).
+						Options(vpnOptions...),
 				),
 			)
-			if err := vpnRemoveForm.Run(); err == nil {
-				fmt.Println(removeVPN(strings.TrimSpace(vpnName)))
+			
+			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+				var confirmed bool
+				confirmForm := huh.NewForm(
+					huh.NewGroup(
+						huh.NewConfirm().
+							Title(fmt.Sprintf("Are you sure you want to remove %s?", selectedVPN)).
+							Value(&confirmed),
+					),
+				)
+				
+				if err := confirmForm.Run(); err == nil && confirmed {
+					fmt.Println(removeVPN(selectedVPN))
+				}
+			}
+			
+		case ExportVPN:
+			vpns := getVPNList()
+			if len(vpns) == 0 {
+				fmt.Println("No VPN connections available to export")
+				continue
+			}
+			
+			var selectedVPN string
+			vpnOptions := make([]huh.Option[string], len(vpns))
+			for i, vpn := range vpns {
+				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+			}
+			
+			vpnForm := huh.NewForm(
+				huh.NewGroup(
+					huh.NewSelect[string]().
+						Title("Select VPN to export").
+						Value(&selectedVPN).
+						Options(vpnOptions...),
+				),
+			)
+			
+			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+				var outputPath string
+				pathForm := huh.NewForm(
+					huh.NewGroup(
+						huh.NewInput().
+							Title("Enter export path (leave empty for default)").
+							Value(&outputPath).
+							Placeholder(fmt.Sprintf("~/Desktop/%s.ovpn", selectedVPN)),
+					),
+				)
+				
+				if err := pathForm.Run(); err == nil {
+					fmt.Println(exportVPN(selectedVPN, strings.TrimSpace(outputPath)))
+				}
 			}
 			
 		case Exit:
