@@ -174,7 +174,7 @@ func main() {
 						huh.NewOption[Action](string(Exit), Exit),
 					),
 			),
-		)
+		).WithTheme(huh.ThemeCatppuccin())
 		
 		if err := form.Run(); err != nil {
 			fmt.Println("Error:", err)
@@ -182,132 +182,132 @@ func main() {
 		}
 		
 		switch action {
-		case Connect:
-			vpns := getVPNList()
-			if len(vpns) == 0 {
-				fmt.Println("No VPN connections available")
-				continue
-			}
-			
-			var selectedVPN string
-			vpnOptions := make([]huh.Option[string], len(vpns))
-			for i, vpn := range vpns {
-				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
-			}
-			
-			vpnForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewSelect[string]().
-						Title("Select VPN to connect").
-						Value(&selectedVPN).
-						Options(vpnOptions...),
-				),
-			)
-			
-			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
-				fmt.Println(connectVPN(selectedVPN))
-			}
-			
-		case Disconnect:
-			fmt.Println(disconnectVPN())
-			
-		case ListVPNs:
-			fmt.Println(listVPNs())
-			
-		case Status:
-			fmt.Println("VPN Status:")
-			fmt.Println(vpnStatus())
-			
-		case AddVPN:
-			var vpnFile string
-			vpnFileForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewInput().
-						Title("Enter path to .ovpn file").
-						Value(&vpnFile),
-				),
-			)
-			if err := vpnFileForm.Run(); err == nil {
-				fmt.Println(addVPN(strings.TrimSpace(vpnFile)))
-			}
-			
-		case RemoveVPN:
-			vpns := getVPNList()
-			if len(vpns) == 0 {
-				fmt.Println("No VPN connections available to remove")
-				continue
-			}
-			
-			var selectedVPN string
-			vpnOptions := make([]huh.Option[string], len(vpns))
-			for i, vpn := range vpns {
-				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
-			}
-			
-			vpnForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewSelect[string]().
-						Title("Select VPN to remove").
-						Value(&selectedVPN).
-						Options(vpnOptions...),
-				),
-			)
-			
-			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
-				var confirmed bool
-				confirmForm := huh.NewForm(
-					huh.NewGroup(
-						huh.NewConfirm().
-							Title(fmt.Sprintf("Are you sure you want to remove %s?", selectedVPN)).
-							Value(&confirmed),
-					),
-				)
-				
-				if err := confirmForm.Run(); err == nil && confirmed {
-					fmt.Println(removeVPN(selectedVPN))
+			case Connect:
+				vpns := getVPNList()
+				if len(vpns) == 0 {
+					fmt.Println("No VPN connections available")
+					continue
 				}
-			}
-			
-		case ExportVPN:
-			vpns := getVPNList()
-			if len(vpns) == 0 {
-				fmt.Println("No VPN connections available to export")
-				continue
-			}
-			
-			var selectedVPN string
-			vpnOptions := make([]huh.Option[string], len(vpns))
-			for i, vpn := range vpns {
-				vpnOptions[i] = huh.NewOption[string](vpn, vpn)
-			}
-			
-			vpnForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewSelect[string]().
-						Title("Select VPN to export").
-						Value(&selectedVPN).
-						Options(vpnOptions...),
-				),
-			)
-			
-			if err := vpnForm.Run(); err == nil && selectedVPN != "" {
-				var outputPath string
-				pathForm := huh.NewForm(
+				
+				var selectedVPN string
+				vpnOptions := make([]huh.Option[string], len(vpns))
+				for i, vpn := range vpns {
+					vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+				}
+				
+				vpnForm := huh.NewForm(
+					huh.NewGroup(
+						huh.NewSelect[string]().
+							Title("Select VPN to connect").
+							Value(&selectedVPN).
+							Options(vpnOptions...),
+					),
+				).WithTheme(huh.ThemeCatppuccin())
+				
+				if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+					fmt.Println(connectVPN(selectedVPN))
+				}
+				
+			case Disconnect:
+				fmt.Println(disconnectVPN())
+				
+			case ListVPNs:
+				fmt.Println(listVPNs())
+				
+			case Status:
+				fmt.Println("VPN Status:")
+				fmt.Println(vpnStatus())
+				
+			case AddVPN:
+				var vpnFile string
+				vpnFileForm := huh.NewForm(
 					huh.NewGroup(
 						huh.NewInput().
-							Title("Enter export path (leave empty for default)").
-							Value(&outputPath).
-							Placeholder(fmt.Sprintf("~/Desktop/%s.ovpn", selectedVPN)),
+							Title("Enter path to .ovpn file").
+							Value(&vpnFile),
 					),
-				)
-				
-				if err := pathForm.Run(); err == nil {
-					fmt.Println(exportVPN(selectedVPN, strings.TrimSpace(outputPath)))
+				).WithTheme(huh.ThemeCatppuccin())
+				if err := vpnFileForm.Run(); err == nil {
+					fmt.Println(addVPN(strings.TrimSpace(vpnFile)))
 				}
-			}
-			
-		case Exit:
-			return
+				
+			case RemoveVPN:
+				vpns := getVPNList()
+				if len(vpns) == 0 {
+					fmt.Println("No VPN connections available to remove")
+					continue
+				}
+				
+				var selectedVPN string
+				vpnOptions := make([]huh.Option[string], len(vpns))
+				for i, vpn := range vpns {
+					vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+				}
+				
+				vpnForm := huh.NewForm(
+					huh.NewGroup(
+						huh.NewSelect[string]().
+							Title("Select VPN to remove").
+							Value(&selectedVPN).
+							Options(vpnOptions...),
+					),
+				).WithTheme(huh.ThemeCatppuccin())
+				
+				if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+					var confirmed bool
+					confirmForm := huh.NewForm(
+						huh.NewGroup(
+							huh.NewConfirm().
+								Title(fmt.Sprintf("Are you sure you want to remove %s?", selectedVPN)).
+								Value(&confirmed),
+						),
+					).WithTheme(huh.ThemeCatppuccin())
+					
+					if err := confirmForm.Run(); err == nil && confirmed {
+						fmt.Println(removeVPN(selectedVPN))
+					}
+				}
+				
+			case ExportVPN:
+				vpns := getVPNList()
+				if len(vpns) == 0 {
+					fmt.Println("No VPN connections available to export")
+					continue
+				}
+				
+				var selectedVPN string
+				vpnOptions := make([]huh.Option[string], len(vpns))
+				for i, vpn := range vpns {
+					vpnOptions[i] = huh.NewOption[string](vpn, vpn)
+				}
+				
+				vpnForm := huh.NewForm(
+					huh.NewGroup(
+						huh.NewSelect[string]().
+							Title("Select VPN to export").
+							Value(&selectedVPN).
+							Options(vpnOptions...),
+					),
+				).WithTheme(huh.ThemeCatppuccin())
+				
+				if err := vpnForm.Run(); err == nil && selectedVPN != "" {
+					var outputPath string
+					pathForm := huh.NewForm(
+						huh.NewGroup(
+							huh.NewInput().
+								Title("Enter export path (leave empty for default)").
+								Value(&outputPath).
+								Placeholder(fmt.Sprintf("~/Desktop/%s.ovpn", selectedVPN)),
+						),
+					).WithTheme(huh.ThemeCatppuccin())
+					
+					if err := pathForm.Run(); err == nil {
+						fmt.Println(exportVPN(selectedVPN, strings.TrimSpace(outputPath)))
+					}
+				}
+				
+			case Exit:
+				return
 		}
 	}
 }
